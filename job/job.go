@@ -1,3 +1,11 @@
+/*******************************************************************
+ * Copyright (c) 2017 POET Industries
+ *
+ * This code is distributed under the MIT License. For a
+ * complete list of terms see accompanying LICENSE file
+ * or copy at http://opensource.org/licenses/MIT
+ *******************************************************************/
+
 package job
 
 import (
