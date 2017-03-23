@@ -1,0 +1,12 @@
+[Unit]
+Description=Gron webcron service
+After=network.target
+
+[Service]
+User=cron
+WorkingDirectory=~
+ExecStart=/home/cron/gron
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
