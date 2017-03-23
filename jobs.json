@@ -1,0 +1,14 @@
+[
+    {
+        "url"     : "http://www.example.org/cron",
+        "date"    : null,
+        "interval": "15m",
+        "comment" : "Example for cron job running in 15-minute intervals"
+    },
+    {
+        "url"     : "https://www.example.org/cron/cron.php",
+        "date"    : "2017-04-01 12:00:00",
+        "interval": "168h",
+        "comment" : "Example for cron job starting at specified date and running once a week"
+    }
+]
