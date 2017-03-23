@@ -9,6 +9,8 @@
 package job
 
 import (
+	"io/ioutil"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -30,8 +32,17 @@ func New() *Job {
 }
 
 func (j *Job) Run(s chan<- Status) {
-	// TODO 2017-03-23: implement properly
-	s <- Status{OK: true}
+	res, err := http.Get(j.URL)
+	if err != nil {
+		s <- Status{Data: []byte(err.Error())}
+	} else if data, err := ioutil.ReadAll(res.Body); err != nil {
+		s <- Status{Data: []byte(err.Error())}
+	} else if res.StatusCode != 200 {
+		s <- Status{OK: false, Data: []byte(res.Status)}
+	} else {
+		s <- Status{OK: true, Data: data}
+	}
+	res.Body.Close()
 }
 
 func (j *Job) Start(wg *sync.WaitGroup) {
@@ -48,9 +59,9 @@ func (j *Job) Start(wg *sync.WaitGroup) {
 	for range ticker.C {
 		go j.Run(status)
 		if s := <-status; !s.OK {
-			println(j.ID, "status failure")
+			println(j.ID, "failure", string(s.Data))
 		} else {
-			println(j.ID, "status success")
+			println(j.ID, "success", string(s.Data))
 		}
 	}
 }
