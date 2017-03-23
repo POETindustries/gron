@@ -12,10 +12,14 @@ import (
 	"encoding/json"
 	"gron/job"
 	"io/ioutil"
+	"os"
 	"sync"
 )
 
 func main() {
+	os.RemoveAll("log")
+	os.Mkdir("log", 0700)
+
 	jobs := []*job.Job{}
 	if data, err := ioutil.ReadFile("jobs.json"); err != nil {
 		println("Error reading job file:", err.Error())

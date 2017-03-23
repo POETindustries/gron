@@ -9,15 +9,20 @@
 package job
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 )
 
 type Status struct {
-	OK   bool
-	Data []byte
+	JobID int
+	OK    bool
+	URL   string
+	Data  []byte
 }
 
 type Job struct {
@@ -25,24 +30,37 @@ type Job struct {
 	URL      string `json:"url"`
 	Date     string `json:"date"`
 	Interval string `json:"interval"`
+
+	KeepLog         bool   `json:"notify_log"`
+	NotifyByMail    bool   `json:"notify_mail"`
+	NotifyOnFailure bool   `json:"notify_on_failure"`
+	NotifyInterval  string `json:"notify_interval"`
+
+	MailUser string `json:"mail_user"`
+	MailPass string `json:"mail_password"`
+	MailHost string `json:"mail_host_smtp"`
+	MailPort uint16 `json:"mail_port_smtp"`
 }
 
 func New() *Job {
 	return &Job{}
 }
 
-func (j *Job) Run(s chan<- Status) {
+func (j *Job) Run(s chan<- *Status) {
+	stat := &Status{JobID: j.ID, URL: j.URL}
 	res, err := http.Get(j.URL)
 	if err != nil {
-		s <- Status{Data: []byte(err.Error())}
+		stat.Data = []byte(err.Error())
 	} else if data, err := ioutil.ReadAll(res.Body); err != nil {
-		s <- Status{Data: []byte(err.Error())}
+		stat.Data = []byte(err.Error())
 	} else if res.StatusCode != 200 {
-		s <- Status{OK: false, Data: []byte(res.Status)}
+		stat.Data = []byte(res.Status)
 	} else {
-		s <- Status{OK: true, Data: data}
+		stat.OK = true
+		stat.Data = data
 	}
 	res.Body.Close()
+	s <- stat
 }
 
 func (j *Job) Start(wg *sync.WaitGroup) {
@@ -52,17 +70,13 @@ func (j *Job) Start(wg *sync.WaitGroup) {
 		println("Job.Start:", err.Error())
 		return
 	}
-	status := make(chan Status)
+	status := make(chan *Status)
 	time.Sleep(j.firstRunInterval())
 	ticker := time.NewTicker(dur)
 	defer ticker.Stop()
 	for range ticker.C {
 		go j.Run(status)
-		if s := <-status; !s.OK {
-			println(j.ID, "failure", string(s.Data))
-		} else {
-			println(j.ID, "success", string(s.Data))
-		}
+		j.handleStatus(<-status)
 	}
 }
 
@@ -74,4 +88,28 @@ func (j *Job) firstRunInterval() time.Duration {
 		}
 	}
 	return 0
+}
+
+func (j *Job) handleStatus(s *Status) {
+	if j.KeepLog {
+		j.log(s)
+	}
+	if !s.OK && j.NotifyOnFailure {
+		j.notify(s)
+	}
+}
+
+func (j *Job) log(s *Status) {
+	path := "log/" + strconv.Itoa(j.ID) + ".log"
+	flag := os.O_WRONLY | os.O_APPEND | os.O_CREATE
+	if f, err := os.OpenFile(path, flag, 0600); err == nil {
+		defer f.Close()
+		line := fmt.Sprintf("%s Job %d %s: Success? %t. %s\r\n",
+			time.Now().Format("2006-01-02 15:04:05"), j.ID, j.URL, s.OK, s.Data)
+		f.WriteString(line)
+	}
+}
+
+func (j *Job) notify(s *Status) {
+	// TODO 2017-03-23: Implement email notification
 }

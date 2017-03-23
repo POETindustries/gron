@@ -1,14 +1,36 @@
 [
     {
-        "url"     : "http://www.example.org/cron",
-        "date"    : null,
-        "interval": "15m",
+        "url"      : "http://www.example.org/cron",
+        "date"     : null,
+        "interval" : "15m",
+
+        "notify_log"        : true,
+        "notify_mail"       : true,
+        "notify_on_failure" : true,
+        "notify_interval"   : "24h",
+
+        "mail_user"      : "admin@example.org",
+        "mail_password"  : "topsecret",
+        "mail_host_smtp" : "smtp.example.org",
+        "mail_port_smtp" : 587,
+
         "comment" : "Example for cron job running in 15-minute intervals"
     },
     {
         "url"     : "https://www.example.org/cron/cron.php",
         "date"    : "2017-04-01 12:00:00",
         "interval": "168h",
+
+        "notify_log"        : true,
+        "notify_mail"       : true,
+        "notify_on_failure" : true,
+        "notify_interval"   : "24h",
+
+        "mail_user"      : "admin@example.org",
+        "mail_password"  : "topsecret",
+        "mail_host_smtp" : "smtp.example.org",
+        "mail_port_smtp" : 587,
+
         "comment" : "Example for cron job starting at specified date and running once a week"
     }
 ]
