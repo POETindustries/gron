@@ -19,10 +19,8 @@ import (
 )
 
 type Status struct {
-	JobID int
-	OK    bool
-	URL   string
-	Data  []byte
+	OK   bool
+	Data []byte
 }
 
 type Job struct {
@@ -47,7 +45,7 @@ func New() *Job {
 }
 
 func (j *Job) Run(s chan<- *Status) {
-	stat := &Status{JobID: j.ID, URL: j.URL}
+	stat := &Status{}
 	res, err := http.Get(j.URL)
 	if err != nil {
 		stat.Data = []byte(err.Error())
@@ -71,7 +69,7 @@ func (j *Job) Start(wg *sync.WaitGroup) {
 		return
 	}
 	status := make(chan *Status)
-	time.Sleep(j.firstRunInterval())
+	time.Sleep(j.firstRunInterval(dur))
 	ticker := time.NewTicker(dur)
 	defer ticker.Stop()
 	for range ticker.C {
@@ -80,12 +78,14 @@ func (j *Job) Start(wg *sync.WaitGroup) {
 	}
 }
 
-func (j *Job) firstRunInterval() time.Duration {
+func (j *Job) firstRunInterval(interval time.Duration) time.Duration {
 	start, err := time.Parse("2006-01-02 15:04:05", j.Date)
 	if err == nil {
-		if dur := time.Until(start); dur > 0 {
-			return dur
+		dur := time.Until(start)
+		for dur < 0 {
+			dur += interval
 		}
+		return dur
 	}
 	return 0
 }
