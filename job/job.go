@@ -73,18 +73,31 @@ func (j *Job) Run(s chan<- *Status) {
 // and starts the necessary tickers as well as the main execution loop.
 func (j *Job) Start(wg *sync.WaitGroup) {
 	defer wg.Done()
-	dur, err := time.ParseDuration(j.Interval)
+	deltaTick, err := time.ParseDuration(j.Interval)
 	if err != nil {
-		println("Job.Start:", err.Error())
+		return
+	}
+	deltaNotify, err := time.ParseDuration(j.NotifyInterval)
+	if err != nil {
 		return
 	}
 	status := make(chan *Status)
-	time.Sleep(j.firstRunInterval(dur))
-	ticker := time.NewTicker(dur)
+	time.Sleep(j.firstRunInterval(deltaTick))
+	ticker := time.NewTicker(deltaTick)
 	defer ticker.Stop()
-	for range ticker.C {
-		go j.Run(status)
-		j.handleStatus(<-status)
+	notifier := time.NewTicker(deltaNotify)
+	defer notifier.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			go j.Run(status)
+			j.handleStatus(<-status)
+		case <-notifier.C:
+			if j.NotifyByMail {
+				j.notify(nil)
+			}
+			os.Remove("log/" + strconv.Itoa(j.ID) + ".log")
+		}
 	}
 }
 
