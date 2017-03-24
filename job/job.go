@@ -13,16 +13,21 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"sail/email"
 	"strconv"
 	"sync"
 	"time"
 )
 
+// Status contains information about a job that has just finished running.
 type Status struct {
 	OK   bool
 	Data []byte
 }
 
+// Job runs the cron job at the location designated by URL. It handles
+// execution scheduling, status logging and e-mail notification in
+// case of errors.
 type Job struct {
 	ID       int    `json:"-"`
 	URL      string `json:"url"`
@@ -40,10 +45,13 @@ type Job struct {
 	MailPort uint16 `json:"mail_port_smtp"`
 }
 
+// New acts as Job constructor and returns an empty Job struct.
 func New() *Job {
 	return &Job{}
 }
 
+// Run executes the cron job and generates a Status object which is
+// passed to the receiver channel s.
 func (j *Job) Run(s chan<- *Status) {
 	stat := &Status{}
 	res, err := http.Get(j.URL)
@@ -61,6 +69,8 @@ func (j *Job) Run(s chan<- *Status) {
 	s <- stat
 }
 
+// Start handles Job initialization such as date and interval parsing
+// and starts the necessary tickers as well as the main execution loop.
 func (j *Job) Start(wg *sync.WaitGroup) {
 	defer wg.Done()
 	dur, err := time.ParseDuration(j.Interval)
@@ -104,12 +114,37 @@ func (j *Job) log(s *Status) {
 	flag := os.O_WRONLY | os.O_APPEND | os.O_CREATE
 	if f, err := os.OpenFile(path, flag, 0600); err == nil {
 		defer f.Close()
-		line := fmt.Sprintf("%s Job %d %s: Success? %t. %s\r\n",
+		line := fmt.Sprintf("%s Job %d %s: Success? %t. Message: %s\r\n",
 			time.Now().Format("2006-01-02 15:04:05"), j.ID, j.URL, s.OK, s.Data)
 		f.WriteString(line)
 	}
 }
 
-func (j *Job) notify(s *Status) {
-	// TODO 2017-03-23: Implement email notification
+// Notify sends e-mail notification pertaining to the related job.
+// It takes one argument, a Status object s. If s is not nil, an
+// e-mail will be sent containing only the information about the
+// execution attempt that produced s. If the argument is nil, an
+// e-mail is created that contains all status messages currently
+// held in the log. Notify does not flush the log by itself.
+func (j *Job) notify(s *Status) bool {
+	sender := &email.Sender{
+		Name:    "Gron Webcron Server",
+		Address: j.MailUser,
+		Pass:    j.MailPass,
+		Host:    j.MailHost,
+		Port:    j.MailPort}
+	mail := email.New(sender)
+	mail.Subject = time.Now().Format("2006-01-02") + ": Gron Status Summary"
+	mail.To = []email.Recipient{{Address: j.MailUser}}
+	if s != nil {
+		mail.Body = fmt.Sprintf("%s Job %d %s: Success? %t. Message: %s\r\n",
+			time.Now().Format("2006-01-02 15:04:05"), j.ID, j.URL, s.OK, s.Data)
+	} else {
+		stats, err := ioutil.ReadFile("log/" + strconv.Itoa(j.ID) + ".log")
+		if err != nil {
+			return false
+		}
+		mail.Body = string(stats)
+	}
+	return (mail.Send() != nil)
 }
