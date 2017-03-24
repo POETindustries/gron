@@ -93,10 +93,9 @@ func (j *Job) Start(wg *sync.WaitGroup) {
 			go j.Run(status)
 			j.handleStatus(<-status)
 		case <-notifier.C:
-			if j.NotifyByMail {
-				j.notify(nil)
+			if !j.NotifyByMail || j.notify(nil) {
+				os.Remove("log/" + strconv.Itoa(j.ID) + ".log")
 			}
-			os.Remove("log/" + strconv.Itoa(j.ID) + ".log")
 		}
 	}
 }
@@ -159,5 +158,9 @@ func (j *Job) notify(s *Status) bool {
 		}
 		mail.Body = string(stats)
 	}
-	return (mail.Send() != nil)
+	if err := mail.Send(); err != nil {
+		j.log(&Status{Data: []byte(err.Error())})
+		return false
+	}
+	return true
 }
